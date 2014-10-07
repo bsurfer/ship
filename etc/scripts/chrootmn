@@ -24,7 +24,6 @@ cfg = Config(f)
 farm_folder=cfg.farm_folder
 config_folder=cfg.config_folder
 
-
 def valid_ip(ip):
         try:
                 socket.inet_aton(ip)
@@ -318,18 +317,12 @@ def exit():
 
 #__init
 if len(sys.argv) > 1 and len(sys.argv) < 4:
-    #if len(sys.argv) == 2 and sys.argv[1]=='list':
-    #    print 'Chroots available:'
-    #    print list_chroots()
     if len(sys.argv) == 2 and sys.argv[1]=='start':
         print 'Start all'
         start_chroot()
     elif len(sys.argv) == 2 and sys.argv[1]=='stop':
         print 'Stop all'
         stop_chroot()
-    #elif len(sys.argv) == 2 and sys.argv[1]=='status':
-    #    print 'Status all'
-    #    status_chroot()
     elif len(sys.argv) == 3 and sys.argv[1]=='start':
         ch=sys.argv[2]
         print 'Start %s' %ch
@@ -338,12 +331,8 @@ if len(sys.argv) > 1 and len(sys.argv) < 4:
         ch=sys.argv[2]
         print 'Stop %s' %ch
         stop_chroot(ch) 
-    #elif len(sys.argv) == 3 and sys.argv[1]=='status':
-    #    ch=sys.argv[2]
-    #    print 'Status %s' %ch
-    #    status_chroot(ch) 
     elif len(sys.argv) == 2 and sys.argv[1]=='status':
-        #ch=sys.argv[2]
+        print 'Status all'
         status_all() 
     elif len(sys.argv) == 3 and sys.argv[1]=='connect':
         ch=sys.argv[2]
