@@ -209,7 +209,6 @@ def create_network_stage2_wan(pid,chroot):
 	os.system('ifconfig %swan promisc' %chroot)
 	os.system('ifconfig %swan up' %chroot )
 
-
 #stop services
 def stop_chroot(value='all'):
     print 'Shutdown Process'
