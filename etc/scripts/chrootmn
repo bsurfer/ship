@@ -46,10 +46,7 @@ def check_ip(ip):
                 return False
 
 def list_chroots():
-    chroot=[]
-    for filename in os.listdir(farm_folder):
-        chroot.append(filename)
-    return chroot
+	return os.listdir(farm_folder)
 
 def get_ip_chroot(path):
 	if os.path.isfile('%s%s/etc/network/interfaces' %(farm_folder,path)):
@@ -60,7 +57,6 @@ def get_ip_chroot(path):
 
 def validate_stop(ip):
     if check_ip(str(ip)) is False:
-        #can be eliminated
         return ip
     else:
         return None
@@ -90,14 +86,17 @@ def status_chroot(value='all'):
 	for pid in pids[0].split():
 		#print 'father: '+pid
 		pid = str(pid)
-        	cmd=("ps faux | grep %s | grep -v grep |  awk -F '/farm/'  '{print $2}' |  awk  '{print $1}'") %pid
+        	#cmd=("ps faux | grep %s | grep -v grep |  awk -F '/farm/'  '{print $2}' |  awk  '{print $1}'") %pid
+        	cmd=("ps faux | grep %s | grep -v grep | grep -v nsenter | awk -F ' chroot '  '{print $2}' | awk '{print $1 }'  | awk -F '/' '{print $NF}' ") %pid
         	chroot = os.popen(cmd).readlines()
         	cmd=('ps -o pid --ppid %s | tail -1') %pid
         	pi = os.popen(cmd).readlines()
 		#print 'child: '+pi[0][:-1]
 		print 'Chroot : '+chroot[0][:-1]+' its UP!! PID: '+pi[0][:-1]
     else:
-	cmd=("ps -ef | grep %s | grep -v grep | grep '/farm/'| awk  '{print $2}'") %value
+	print value
+	#cmd=("ps -ef | grep %s | grep -v grep | grep '/farm/'| awk  '{print $2}'") %value
+	cmd=("ps -ef | grep %s | grep -v grep | grep -v nsenter| awk '{print $2}'") %value
         pid = os.popen(cmd).readlines()
 	if len(pid) < 1:
 		print 'Chroot not found!!!!!'
@@ -137,7 +136,6 @@ def start_chroot(value='all'):
                         create_network_stage2_wan(pid,chroot)
             else:
                 print 'The file %s%s/etc/init.d/start_chroot do not exist!!!' %(farm_folder,chroot)
-            line()
     else:
         if os.path.isdir('%s%s' %(farm_folder,value)):
             if os.path.isfile('%s%s/etc/init.d/start_chroot' %(farm_folder,value)):
@@ -159,7 +157,6 @@ def start_chroot(value='all'):
                 print 'The file %s%s/etc/init.d/start_chroot do not exist!!!!' %(farm_folder,value)
         else:
             print 'The %s%s do not exist!!!!' %(farm_folder,value)
-        line()
 
 
 def get_unshare_pid(chroot):
@@ -252,7 +249,6 @@ def stop_chroot(value='all'):
             print 'The %s%s do not exist!!!!' %(farm_folder,value)
 
 
-
 def connect(name):
     pids = os.popen('pidof unshare').readlines()
     if len(pids) < 1:
@@ -316,7 +312,7 @@ def setup_chroot(chroot_name):
 		"none    /dev/pts    devpts    defaults    0    0\n"
 	)
 	write_files(fstabfile,text,'wb')
-	os.system('chmod +x %s%s/etc/init.d/start_chroot; chmod +x %s%s/etc/init.d/services_fixe' %(farm_folder,chroot_name,farm_folder,chroot_name))
+	os.system('chmod +x %s%s/etc/init.d/start_chroot;' %(farm_folder,chroot_name))
 
 def write_files(filename,text,mode):
 	f1 = open(filename,mode)
