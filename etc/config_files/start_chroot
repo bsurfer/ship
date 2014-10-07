@@ -1,0 +1,44 @@
+#!/bin/bash
+### BEGIN INIT INFO
+# Provides:          chroot_startup
+# Required-Start:    
+# Required-Stop:     
+# Should-Start:      
+# Should-Stop:       
+# X-Start-Before:    
+# X-Stop-After:      
+# Default-Start:     
+# Default-Stop:      
+# X-Interactive:     true
+# Short-Description: Start/stop unshare chroot
+# Description:       This file should be used to start and stop unshare chroot
+#                    placed in /etc/init.d.
+### END INIT INFO
+
+umount -a
+sleep 3
+for ser in `ls /etc/rcS.d/S*`
+do
+        $ser start
+done
+for ser in `ls  /etc/rc2.d/S*`
+do
+        $ser start
+done
+clean_up() {
+for ser in `ls -r /etc/rc2.d/S*`
+do
+        $ser stop
+done
+for ser in `ls -r /etc/rcS.d/S*`
+do
+        $ser stop
+done
+exit 0
+}
+
+trap "clean_up" TERM
+while /bin/true
+do
+        sleep 86400 & wait $1
+done

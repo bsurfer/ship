@@ -1,0 +1,370 @@
+#!/usr/bin/env python
+###########################
+'''
+author: beto
+email: alberto.ferreira@fixeads.com
+description: This script it's used to do the chroot management, i.e., start/stop chroot and they services
+The default folder used to chroot it's: /storage/chroot/farm/, you can change it in /etc/chroot/config/chroot.cfg
+You must be root to do that
+'''
+###########################
+import os
+import sys
+import ipaddr
+import socket
+import subprocess
+import time
+import random
+import sh
+from config import Config
+
+#Read config values
+f = file('/etc/chroot/config/chroot.cfg')
+cfg = Config(f)
+farm_folder=cfg.farm_folder
+config_folder=cfg.config_folder
+
+
+def valid_ip(ip):
+        try:
+                socket.inet_aton(ip)
+                return True
+        except socket.error:
+                return False
+
+def ping_ip(ip):
+	try:
+        	sh.ping(ip, "-c 1", _out="/dev/null")
+		return True
+	except sh.ErrorReturnCode_1:
+		return False
+
+def check_ip(ip):
+        if valid_ip(ip) is True and ping_ip(ip) is False:
+                return True
+        else:
+                return False
+
+def list_chroots():
+    chroot=[]
+    for filename in os.listdir(farm_folder):
+        chroot.append(filename)
+    return chroot
+
+def get_ip_chroot(path):
+	if os.path.isfile('%s%s/etc/network/interfaces' %(farm_folder,path)):
+		get_ip=("cat %s%s/etc/network/interfaces  | grep addr |awk '{print $2}' | head -n1" ) %(farm_folder,path)
+		ip = os.popen(get_ip).readlines()
+		ips = str(ip[0][:-1])
+		return ips
+
+def validate_stop(ip):
+    if check_ip(str(ip)) is False:
+        #can be eliminated
+        return ip
+    else:
+        return None
+
+def validate_start(ip):
+    if check_ip(str(ip)) is True:
+        #can be created
+        return ip
+    else:
+        return None
+
+def chroot_exist(name):
+	for item in list_chroots():
+	    if str(item) == str(name[:-1]):
+	        return True
+		break
+	return False
+
+def status_chroot(value='all'):
+    status=False
+    pids = os.popen('pidof unshare').readlines()
+    if len(pids) < 1:
+	print 'Nothing Running'
+	return False
+
+    if value is 'all':
+	for pid in pids[0].split():
+		#print 'father: '+pid
+		pid = str(pid)
+        	cmd=("ps faux | grep %s | grep -v grep |  awk -F '/farm/'  '{print $2}' |  awk  '{print $1}'") %pid
+        	chroot = os.popen(cmd).readlines()
+        	cmd=('ps -o pid --ppid %s | tail -1') %pid
+        	pi = os.popen(cmd).readlines()
+		#print 'child: '+pi[0][:-1]
+		print 'Chroot : '+chroot[0][:-1]+' its UP!! PID: '+pi[0][:-1]
+    else:
+	cmd=("ps -ef | grep %s | grep -v grep | grep '/farm/'| awk  '{print $2}'") %value
+        pid = os.popen(cmd).readlines()
+	if len(pid) < 1:
+		print 'Chroot not found!!!!!'
+		return False
+	else:
+		for pi in pids[0].split():
+			if len(pid) > 0 and pi == pid[0][:-1]:
+				status=True
+		if status is True:
+        		cmd=('ps -o pid --ppid %s | tail -1') %pid[0][:-1]
+        		pi = os.popen(cmd).readlines()
+			print 'Chroot : '+value+' its UP!! PID: '+pi[0][:-1]
+			return True
+		else:
+			print 'Chroot not found!!!!!'
+			return False
+		
+def start_chroot(value='all'):
+    print 'Start Chroot'
+    if value is 'all':
+        for chroot in list_chroots():
+            print 'Chroot %s' %chroot
+            #if os.path.isfile('/storage/chroot/farm/%s/etc/init.d/start_chroot' %chroot):
+            if os.path.isfile('%s%s/etc/init.d/start_chroot' %(farm_folder,chroot)):
+		if status_chroot(chroot) is True:
+			print 'Nothing to do!!'
+		else:
+		    start_network(chroot)
+		    if get_interfaces(chroot) is '2':
+                        create_network_wan(chroot)
+                    cmd=('setsid %sbin/unshare -m -p -u -n -f chroot %s%s /etc/init.d/start_chroot ') %(config_folder,farm_folder,chroot)
+		    print 'Launch Chroot'
+		    subprocess.Popen(['/bin/bash', '-c', cmd])
+		    pid = get_unshare_pid(chroot)
+		    create_network_stage2(pid,chroot)
+		    if get_interfaces(value) is '2':
+                        create_network_stage2_wan(pid,chroot)
+            else:
+                print 'The file %s%s/etc/init.d/start_chroot do not exist!!!' %(farm_folder,chroot)
+            line()
+    else:
+        if os.path.isdir('%s%s' %(farm_folder,value)):
+            if os.path.isfile('%s%s/etc/init.d/start_chroot' %(farm_folder,value)):
+		if status_chroot(value) is True:
+			print 'Nothing to do!!'
+		else:
+		    start_network(value)
+		    if get_interfaces(value) is '2':
+                        create_network_wan(value)
+                    cmd=('setsid %sbin/unshare -m -p -u -n -f chroot %s%s /etc/init.d/start_chroot ') %(config_folder,farm_folder,value)
+		    print 'Launch Chroot'
+		    subprocess.Popen(['/bin/bash', '-c', cmd])
+		    pid = get_unshare_pid(value)
+		    create_network_stage2(pid,value)
+		    if get_interfaces(value) is '2':
+                        create_network_stage2_wan(pid,value)
+		    
+            else:
+                print 'The file %s%s/etc/init.d/start_chroot do not exist!!!!' %(farm_folder,value)
+        else:
+            print 'The %s%s do not exist!!!!' %(farm_folder,value)
+        line()
+
+
+def get_unshare_pid(chroot):
+	cmd=("ps -ef | grep %s | grep unshare| grep -v grep | grep -v python | awk  '{print $2}'") %chroot
+        pid = os.popen(cmd).readlines()
+	if len(pid) > 0 :
+        	cmd=('ps -o pid --ppid %s | tail -1') %pid[0][:-1]
+        	pi = os.popen(cmd).readlines()
+		return pi[0][:-1]
+
+#start network
+def start_network(value='all'):
+    #start all interfaces
+    print 'NetWork'
+    if value is 'all':
+        for chroot in list_chroots():
+            ip=validate_start(get_ip_chroot(chroot))
+            if ip is not None:
+                print 'Chroot: %s - IP: %s ' %(value,ip)
+                create_network(chroot)
+            else:
+                print 'IP not valid or already exist' 
+		sys.exit()
+    #start just one interface
+    else:
+        if os.path.isdir('%s%s' %(farm_folder,value)):
+            ip=validate_start(get_ip_chroot(value))
+            if ip is not None:
+                print 'Chroot: %s - IP: %s ' %(value,ip)
+                create_network(value)
+            else:
+                print 'IP not valid or already exist' 
+		sys.exit()
+        else:
+            print 'Verify the chroot name'
+
+def create_network(chroot):
+	print 'Create Network'
+	mac=[random.choice(range(256)) for i in range(6)]
+	mac[0] |= 0x02
+	mac[0] &= 0xfe
+	mact=':'.join('%02x' % m for m in mac)
+	os.system('ip link add link eth0 %s address %s type macvtap mode bridge' %(chroot,mact))
+ 
+def create_network_stage2(pid,interface):
+	print 'Put interfaces %s UP!!! PID: %s' %(interface,pid)
+	os.system('ip link set netns %s %s' %(pid,interface))
+
+def create_network_wan(chroot):
+	print 'Create Network'
+        #os.system('ovs-vsctl add-br wanbr eth0')
+	os.system('ip link add %swan type veth peer name veth1' %chroot )
+	os.system('ovs-vsctl del-port wanbr %swan; ovs-vsctl add-port wanbr %swan' %(chroot,chroot))
+	os.system('ifconfig %swan promisc' %chroot)
+ 
+def create_network_stage2_wan(pid,chroot):
+	print 'Put interfaces wan UP!!! PID: %s' %(pid)
+	os.system('ip link set netns %s veth1' %pid)
+	os.system('ifconfig %swan promisc' %chroot)
+	os.system('ifconfig %swan up' %chroot )
+
+
+#stop services
+def stop_chroot(value='all'):
+    print 'Shutdown Process'
+    if value is 'all':
+        for chroot in list_chroots():
+            if os.path.isfile('%s%s/etc/init.d/start_chroot' %(farm_folder,chroot)):
+		if status_chroot(chroot) is True:
+			pid=get_unshare_pid(chroot)
+			print 'Shutdown: %s Pid: %s' %(chroot,pid)
+			os.system('kill %s' %pid)
+		else:
+			print 'Chroot %s not found' %chroot
+            else:
+                print 'The file %s%s/etc/init.d/start_chroot do not exist!!!' %(farm_folder,chroot)
+    else:
+        if os.path.isdir('%s%s' %(farm_folder,value)):
+            if os.path.isfile('%s%s/etc/init.d/start_chroot' %(farm_folder,value)):
+		if status_chroot(value) is True:
+			pid=get_unshare_pid(value)
+			print 'Shutdown: %s Pid: %s' %(value,pid)
+			os.system('kill %s' %pid)
+			os.system('ip link del %s' %value)
+		else:
+			print 'Chroot %s not found' %value
+            else:
+                print 'The file %s%s/etc/init.d/start_chroot do not exist!!!' %(farm_folder,value)
+        else:
+            print 'The %s%s do not exist!!!!' %(farm_folder,value)
+
+
+
+def connect(name):
+    pids = os.popen('pidof unshare').readlines()
+    if len(pids) < 1:
+	print 'Nothing Running'
+	return False
+
+    cmd=("ps -ef | grep %s |grep unshare |grep -v grep | awk  '{print $2}'") %name
+    pid = os.popen(cmd).readlines()
+    if len(pid) < 1:
+	print 'Chroot not found!!!!!'
+	return False
+    else:
+	for pi in pids[0].split():
+		if len(pid) > 0 and pi == pid[0][:-1]:
+			cmd=('ps -o pid --ppid %s | tail -1') %pid[0][:-1]
+			pi = os.popen(cmd).readlines()
+                        cmd=('%sbin/nsenter -t %s  -m -u -p -n chroot %s%s ') %(config_folder,pi[0][:-1],farm_folder,name)
+			os.system(cmd)
+
+def get_interfaces(path):
+    #new system
+    if os.path.isfile('%s%s/etc/network/interfaces' %(farm_folder,path)):
+        get_num=("cat  %s%s/etc/network/interfaces  | grep addr |awk '{print $2}' | wc -l" ) %(farm_folder,path)
+        num = os.popen(get_num).readlines()
+        num = str(num[0][:-1])
+        return num	
+
+def create_chroot(chroot_name):
+	os.system('apt-get install binutils debootstrap')
+	os.system('mkdir -p %s%s' %(farm_folder,chroot_name))
+	os.system('apt-get install binutils debootstrap')
+	os.system('debootstrap --arch  amd64 wheezy %s%s http://http.debian.net/debian' %(farm_folder,chroot_name))
+	os.system('chroot %s%s apt-get install  vim tzdata ssh locales less nmap sudo ntp python-ipaddr uml-utilities' %(farm_folder,chroot_name))
+	os.system('chroot %s%s dpkg-reconfigure tzdata' %(farm_folder,chroot_name))
+	os.system('chroot %s%s dpkg-reconfigure locales' %(farm_folder,chroot_name))
+	#after creation
+	setup_chroot(chroot_name)
+
+def setup_chroot(chroot_name):
+	infile='%s/config_files/interfaces' %(config_folder)
+	outfile='%s%s/etc/network/interfaces' %(farm_folder,chroot_name)
+	fstabfile='%s%s/etc/fstab' %(farm_folder,chroot_name)
+	mtabfile='%s%s/etc/mtab' %(farm_folder,chroot_name)
+	hostfile='%s%s/etc/hostname' %(farm_folder,chroot_name)
+	hostsfile='%s%s/etc/hosts' %(farm_folder,chroot_name)
+	f1 = open(infile, 'r')
+	f2 = open(outfile, 'w')
+	for line in f1:
+		    f2.write(line.replace('NAME', chroot_name))
+	f1.close()
+	f2.close()
+	#hosts
+	write_files(hostsfile,'192.168.79.139		me','ab')
+	#hostname
+	write_files(hostfile,chroot_name,'wb')
+	#mtab
+	write_files(mtabfile,'rootfs / rootfs rw 0 0','wb')
+	#fstab
+	text=("proc     /proc        proc    defaults     0       0\n"
+		"none /sys sysfs defaults 0 0\n"
+		"none    /dev/pts    devpts    defaults    0    0\n"
+	)
+	write_files(fstabfile,text,'wb')
+	os.system('chmod +x %s%s/etc/init.d/start_chroot; chmod +x %s%s/etc/init.d/services_fixe' %(farm_folder,chroot_name,farm_folder,chroot_name))
+
+def write_files(filename,text,mode):
+	f1 = open(filename,mode)
+	f1.write(text)
+	f1.close()
+
+
+def exit():
+    sys.exit('Usage: %s list | start | start chroot | stop | stop chroot | status | status chroot | connect chroot' % sys.argv[0])
+
+
+#__init
+if len(sys.argv) > 1 and len(sys.argv) < 4:
+    if len(sys.argv) == 2 and sys.argv[1]=='list':
+        print 'Chroots available:'
+        print list_chroots()
+    elif len(sys.argv) == 2 and sys.argv[1]=='start':
+        print 'Start all'
+        start_chroot()
+    elif len(sys.argv) == 2 and sys.argv[1]=='stop':
+        print 'Stop all'
+        stop_chroot()
+    elif len(sys.argv) == 2 and sys.argv[1]=='status':
+        print 'Status all'
+        status_chroot()
+    elif len(sys.argv) == 3 and sys.argv[1]=='start':
+        ch=sys.argv[2]
+        print 'Start %s' %ch
+        start_chroot(ch)
+    elif len(sys.argv) == 3 and sys.argv[1]=='stop':
+        ch=sys.argv[2]
+        print 'Stop %s' %ch
+        stop_chroot(ch) 
+    elif len(sys.argv) == 3 and sys.argv[1]=='status':
+        ch=sys.argv[2]
+        print 'Status %s' %ch
+        status_chroot(ch) 
+    elif len(sys.argv) == 3 and sys.argv[1]=='connect':
+        ch=sys.argv[2]
+        print 'Connect %s' %ch
+        connect(ch) 
+    elif len(sys.argv) == 3 and sys.argv[1]=='create':
+        ch=sys.argv[2]
+        print 'Create chroot %s' %ch
+        create_chroot(ch) 
+    else:
+        exit()
+
+else:
+    exit()
+
