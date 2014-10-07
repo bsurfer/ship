@@ -1,0 +1,2 @@
+This script it's used to do the chroot management, i.e., start/stop chroot and they services
+The default folder used to chroot it's: /storage/chroot/farm/, you can change it in /etc/chroot/config/chroot.cfg
