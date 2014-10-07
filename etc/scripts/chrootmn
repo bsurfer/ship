@@ -69,37 +69,24 @@ def validate_start(ip):
         return None
 
 def chroot_exist(name):
-	for item in list_chroots():
-	    if str(item) == str(name[:-1]):
-	        return True
-		break
-	return False
+	if name in list_chroots():
+		return True
+	else:
+		return False
 
-def status_chroot(value='all'):
-    status=False
-    pids = os.popen('pidof unshare').readlines()
-    if len(pids) < 1:
-	print 'Nothing Running'
-	return False
-
-    if value is 'all':
-	for pid in pids[0].split():
-		#print 'father: '+pid
-		pid = str(pid)
-        	#cmd=("ps faux | grep %s | grep -v grep |  awk -F '/farm/'  '{print $2}' |  awk  '{print $1}'") %pid
-        	cmd=("ps faux | grep %s | grep -v grep | grep -v nsenter | awk -F ' chroot '  '{print $2}' | awk '{print $1 }'  | awk -F '/' '{print $NF}' ") %pid
-        	chroot = os.popen(cmd).readlines()
-        	cmd=('ps -o pid --ppid %s | tail -1') %pid
-        	pi = os.popen(cmd).readlines()
-		#print 'child: '+pi[0][:-1]
-		print 'Chroot : '+chroot[0][:-1]+' its UP!! PID: '+pi[0][:-1]
-    else:
-	print value
-	#cmd=("ps -ef | grep %s | grep -v grep | grep '/farm/'| awk  '{print $2}'") %value
+def status_chroot(value):
+    	status=False
+	if not chroot_exist(value):
+		return False
+		
+	pids = os.popen('pidof unshare').readlines()
+	if len(pids) < 1:
+		print '%s Not Running' %value
+		return False
 	cmd=("ps -ef | grep %s | grep -v grep | grep -v nsenter| awk '{print $2}'") %value
         pid = os.popen(cmd).readlines()
 	if len(pid) < 1:
-		print 'Chroot not found!!!!!'
+		print 'Chroot: %s - STOPED' %value
 		return False
 	else:
 		for pi in pids[0].split():
@@ -108,11 +95,16 @@ def status_chroot(value='all'):
 		if status is True:
         		cmd=('ps -o pid --ppid %s | tail -1') %pid[0][:-1]
         		pi = os.popen(cmd).readlines()
-			print 'Chroot : '+value+' its UP!! PID: '+pi[0][:-1]
+			print 'Chroot: '+value+' - STARTED'
+			#print 'Chroot : '+value+' its UP!! PID: '+pi[0][:-1]
 			return True
 		else:
-			print 'Chroot not found!!!!!'
+			print 'Chroot: %s - STOPED' %value
 			return False
+
+def status_all():
+	for chroot in list_chroots():
+		status_chroot(chroot)
 		
 def start_chroot(value='all'):
     print 'Start Chroot'
@@ -312,7 +304,7 @@ def setup_chroot(chroot_name):
 		"none    /dev/pts    devpts    defaults    0    0\n"
 	)
 	write_files(fstabfile,text,'wb')
-	os.system('chmod +x %s%s/etc/init.d/start_chroot;' %(farm_folder,chroot_name))
+	os.system('cp %s/config_files/start_chroot %s%s/etc/init.d/start_chroot ;chmod +x %s%s/etc/init.d/start_chroot;' %(config_folder,farm_folder,chroot_name,farm_folder,chroot_name))
 
 def write_files(filename,text,mode):
 	f1 = open(filename,mode)
@@ -321,23 +313,23 @@ def write_files(filename,text,mode):
 
 
 def exit():
-    sys.exit('Usage: %s list | start | start chroot | stop | stop chroot | status | status chroot | connect chroot' % sys.argv[0])
+    sys.exit('Usage: %s  start | start chroot | stop | stop chroot | status | connect chroot' % sys.argv[0])
 
 
 #__init
 if len(sys.argv) > 1 and len(sys.argv) < 4:
-    if len(sys.argv) == 2 and sys.argv[1]=='list':
-        print 'Chroots available:'
-        print list_chroots()
-    elif len(sys.argv) == 2 and sys.argv[1]=='start':
+    #if len(sys.argv) == 2 and sys.argv[1]=='list':
+    #    print 'Chroots available:'
+    #    print list_chroots()
+    if len(sys.argv) == 2 and sys.argv[1]=='start':
         print 'Start all'
         start_chroot()
     elif len(sys.argv) == 2 and sys.argv[1]=='stop':
         print 'Stop all'
         stop_chroot()
-    elif len(sys.argv) == 2 and sys.argv[1]=='status':
-        print 'Status all'
-        status_chroot()
+    #elif len(sys.argv) == 2 and sys.argv[1]=='status':
+    #    print 'Status all'
+    #    status_chroot()
     elif len(sys.argv) == 3 and sys.argv[1]=='start':
         ch=sys.argv[2]
         print 'Start %s' %ch
@@ -346,10 +338,13 @@ if len(sys.argv) > 1 and len(sys.argv) < 4:
         ch=sys.argv[2]
         print 'Stop %s' %ch
         stop_chroot(ch) 
-    elif len(sys.argv) == 3 and sys.argv[1]=='status':
-        ch=sys.argv[2]
-        print 'Status %s' %ch
-        status_chroot(ch) 
+    #elif len(sys.argv) == 3 and sys.argv[1]=='status':
+    #    ch=sys.argv[2]
+    #    print 'Status %s' %ch
+    #    status_chroot(ch) 
+    elif len(sys.argv) == 2 and sys.argv[1]=='status':
+        #ch=sys.argv[2]
+        status_all() 
     elif len(sys.argv) == 3 and sys.argv[1]=='connect':
         ch=sys.argv[2]
         print 'Connect %s' %ch
