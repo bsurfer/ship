@@ -14,7 +14,7 @@ echo -e 'Create structure'
 mkdir -p  $config_folder
 mkdir -p  $farm_folder
 echo -e 'Copy files'
-cp -r  ship/etc/*  $config_folder
+cp -r  etc/*  $config_folder
 unlink /usr/bin/chrootmn
 ln -s $config_folder/scripts/chrootmn /usr/bin/
 
