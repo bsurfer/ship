@@ -73,6 +73,18 @@ def chroot_exist(name):
 	else:
 		return False
 
+def status_all():
+	for chroot in list_chroots():
+		status_chroot(chroot)
+
+def start_all():
+	for chroot in list_chroots():
+		start_chroot(chroot)
+
+def stop_all():
+	for chroot in list_chroots():
+		stop_chroot(chroot)
+
 def status_chroot(value):
     	status=False
 	if not chroot_exist(value):
@@ -101,53 +113,27 @@ def status_chroot(value):
 			print 'Chroot: %s - STOPED' %value
 			return False
 
-def status_all():
-	for chroot in list_chroots():
-		status_chroot(chroot)
-		
-def start_chroot(value='all'):
-    print 'Start Chroot'
-    if value is 'all':
-        for chroot in list_chroots():
-            print 'Chroot %s' %chroot
-            #if os.path.isfile('/storage/chroot/farm/%s/etc/init.d/start_chroot' %chroot):
-            if os.path.isfile('%s%s/etc/init.d/start_chroot' %(farm_folder,chroot)):
-		if status_chroot(chroot) is True:
-			print 'Nothing to do!!'
-		else:
-		    start_network(chroot)
-		    if get_interfaces(chroot) is '2':
-                        create_network_wan(chroot)
-                    cmd=('setsid %sbin/unshare -m -p -u -n -f chroot %s%s /etc/init.d/start_chroot ') %(config_folder,farm_folder,chroot)
-		    print 'Launch Chroot'
-		    subprocess.Popen(['/bin/bash', '-c', cmd])
-		    pid = get_unshare_pid(chroot)
-		    create_network_stage2(pid,chroot)
-		    if get_interfaces(value) is '2':
-                        create_network_stage2_wan(pid,chroot)
-            else:
-                print 'The file %s%s/etc/init.d/start_chroot do not exist!!!' %(farm_folder,chroot)
-    else:
-        if os.path.isdir('%s%s' %(farm_folder,value)):
-            if os.path.isfile('%s%s/etc/init.d/start_chroot' %(farm_folder,value)):
+
+def start_chroot(value):
+	if not chroot_exist(value):
+		return False
+	
+	if os.path.isfile('%s%s/etc/init.d/start_chroot' %(farm_folder,value)):
 		if status_chroot(value) is True:
 			print 'Nothing to do!!'
 		else:
-		    start_network(value)
-		    if get_interfaces(value) is '2':
-                        create_network_wan(value)
-                    cmd=('setsid %sbin/unshare -m -p -u -n -f chroot %s%s /etc/init.d/start_chroot ') %(config_folder,farm_folder,value)
-		    print 'Launch Chroot'
-		    subprocess.Popen(['/bin/bash', '-c', cmd])
-		    pid = get_unshare_pid(value)
-		    create_network_stage2(pid,value)
-		    if get_interfaces(value) is '2':
-                        create_network_stage2_wan(pid,value)
-		    
-            else:
-                print 'The file %s%s/etc/init.d/start_chroot do not exist!!!!' %(farm_folder,value)
-        else:
-            print 'The %s%s do not exist!!!!' %(farm_folder,value)
+			start_network(value)
+			if get_interfaces(value) is '2':
+				create_network_wan(value)
+			cmd=('setsid %sbin/unshare -m -p -u -n -f chroot %s%s /etc/init.d/start_chroot ') %(config_folder,farm_folder,value)
+			print 'Launch Chroot'
+			subprocess.Popen(['/bin/bash', '-c', cmd])
+			pid = get_unshare_pid(value)
+			create_network_stage2(pid,value)
+			if get_interfaces(value) is '2':
+				create_network_stage2_wan(pid,value)
+	else:
+		print 'The file %s%s/etc/init.d/start_chroot do not exist!!!!' %(farm_folder,value)
 
 
 def get_unshare_pid(chroot):
@@ -160,29 +146,13 @@ def get_unshare_pid(chroot):
 
 #start network
 def start_network(value='all'):
-    #start all interfaces
-    print 'NetWork'
-    if value is 'all':
-        for chroot in list_chroots():
-            ip=validate_start(get_ip_chroot(chroot))
-            if ip is not None:
-                print 'Chroot: %s - IP: %s ' %(value,ip)
-                create_network(chroot)
-            else:
-                print 'IP not valid or already exist' 
+	ip=validate_start(get_ip_chroot(value))
+	if ip is not None:
+		print 'Chroot: %s - IP: %s ' %(value,ip)
+		create_network(value)
+	else:
+		print 'IP not valid or already exist' 
 		sys.exit()
-    #start just one interface
-    else:
-        if os.path.isdir('%s%s' %(farm_folder,value)):
-            ip=validate_start(get_ip_chroot(value))
-            if ip is not None:
-                print 'Chroot: %s - IP: %s ' %(value,ip)
-                create_network(value)
-            else:
-                print 'IP not valid or already exist' 
-		sys.exit()
-        else:
-            print 'Verify the chroot name'
 
 def create_network(chroot):
 	print 'Create Network'
@@ -209,34 +179,20 @@ def create_network_stage2_wan(pid,chroot):
 	os.system('ifconfig %swan promisc' %chroot)
 	os.system('ifconfig %swan up' %chroot )
 
-#stop services
+
 def stop_chroot(value='all'):
-    print 'Shutdown Process'
-    if value is 'all':
-        for chroot in list_chroots():
-            if os.path.isfile('%s%s/etc/init.d/start_chroot' %(farm_folder,chroot)):
-		if status_chroot(chroot) is True:
-			pid=get_unshare_pid(chroot)
-			print 'Shutdown: %s Pid: %s' %(chroot,pid)
-			os.system('kill %s' %pid)
-		else:
-			print 'Chroot %s not found' %chroot
-            else:
-                print 'The file %s%s/etc/init.d/start_chroot do not exist!!!' %(farm_folder,chroot)
-    else:
-        if os.path.isdir('%s%s' %(farm_folder,value)):
-            if os.path.isfile('%s%s/etc/init.d/start_chroot' %(farm_folder,value)):
+	if not chroot_exist(value):
+		return False
+	
+	if os.path.isfile('%s%s/etc/init.d/start_chroot' %(farm_folder,value)):
 		if status_chroot(value) is True:
 			pid=get_unshare_pid(value)
 			print 'Shutdown: %s Pid: %s' %(value,pid)
 			os.system('kill %s' %pid)
-			os.system('ip link del %s' %value)
 		else:
-			print 'Chroot %s not found' %value
-            else:
-                print 'The file %s%s/etc/init.d/start_chroot do not exist!!!' %(farm_folder,value)
-        else:
-            print 'The %s%s do not exist!!!!' %(farm_folder,value)
+			print 'Chroot %s is STOPED' %value
+	else:
+		print 'The file %s%s/etc/init.d/start_chroot do not exist!!!' %(farm_folder,value)
 
 
 def connect(name):
@@ -316,12 +272,12 @@ def exit():
 
 #__init
 if len(sys.argv) > 1 and len(sys.argv) < 4:
-    if len(sys.argv) == 3 and sys.argv[1]=='start all':
+    if len(sys.argv) == 3 and sys.argv[1]=='start' and sys.argv[2]=='all':
         print 'Start all'
-        start_chroot()
-    elif len(sys.argv) == 3 and sys.argv[1]=='stop all':
+	start_all()
+    elif len(sys.argv) == 3 and sys.argv[1]=='stop' and sys.argv[2]=='all':
         print 'Stop all'
-        stop_chroot()
+	stop_all()
     elif len(sys.argv) == 3 and sys.argv[1]=='start':
         ch=sys.argv[2]
         print 'Start %s' %ch

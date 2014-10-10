@@ -4,10 +4,13 @@ ship
 Requirements
 ------------
 - Kernel >= 3.14
+
 Add this repository to install kernel 3.14:
-deb http://http.debian.net/debian wheezy-backports main
+
 ```bash
-apt-get -t wheezy-backports install linux-image-3.14-0.bpo.1-amd64
+deb http://http.debian.net/debian wheezy-backports main
+
+> apt-get -t wheezy-backports install linux-image-3.14-0.bpo.1-amd64
 ```
 
 - Debian/Ubuntu packages:
