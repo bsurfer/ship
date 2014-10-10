@@ -43,13 +43,13 @@ Usage
 Usage: chrootmn [options]
 
 Options:
-  create				create new chroot using debootstrap
-  status				ship's status
-  start all				start ship
-  start ship_name		start just ship_name
-  stop all				stop ship
-  stop ship_name		stop just ship_name
-  con ship_name			enter in ship_name
+  create			create new chroot using debootstrap
+  status			ship's status
+  start all			start all ship's
+  start ship_name		start ship
+  stop all			stop all ship's
+  stop ship_name		stop  ship
+  con ship_name			enter in ship
 ```
 
 Examples:
