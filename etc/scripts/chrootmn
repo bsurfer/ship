@@ -1,9 +1,9 @@
 #!/usr/bin/env python
 ###########################
 '''
-author: beto
-email: alberto.ferreira@fixeads.com
-description: This script it's used to do the chroot management, i.e., start/stop chroot and they services
+author: Beto
+email: bsurfer [at] gmail [dot] com
+description: This script it's used to do the chroot management, i.e., start,stop,create,connect ship's
 The default folder used to chroot it's: /storage/chroot/farm/, you can change it in /etc/chroot/config/chroot.cfg
 You must be root to do that
 '''
@@ -122,15 +122,11 @@ def start_chroot(value):
 			print 'Nothing to do!!'
 		else:
 			start_network(value)
-			if get_interfaces(value) is '2':
-				create_network_wan(value)
 			cmd=('setsid %sbin/unshare -m -p -u -n -f chroot %s%s /etc/init.d/start_chroot ') %(config_folder,farm_folder,value)
 			print 'Launch Chroot'
 			subprocess.Popen(['/bin/bash', '-c', cmd])
 			pid = get_unshare_pid(value)
 			create_network_stage2(pid,value)
-			if get_interfaces(value) is '2':
-				create_network_stage2_wan(pid,value)
 	else:
 		print 'The file %s%s/etc/init.d/start_chroot do not exist!!!!' %(farm_folder,value)
 
@@ -177,18 +173,6 @@ def create_network_stage2(pid,interface):
 	print 'Put interfaces %s UP!!! PID: %s' %(interface,pid)
 	os.system('ip link set netns %s %s' %(pid,interface))
 
-def create_network_wan(chroot):
-	print 'Create Network'
-	os.system('ip link add %swan type veth peer name veth1' %chroot )
-	os.system('ovs-vsctl del-port wanbr %swan; ovs-vsctl add-port wanbr %swan' %(chroot,chroot))
-	os.system('ifconfig %swan promisc' %chroot)
- 
-def create_network_stage2_wan(pid,chroot):
-	print 'Put interfaces wan UP!!! PID: %s' %(pid)
-	os.system('ip link set netns %s veth1' %pid)
-	os.system('ifconfig %swan promisc' %chroot)
-	os.system('ifconfig %swan up' %chroot )
-
 def connect(name):
     pids = os.popen('pidof unshare').readlines()
     if len(pids) < 1:
@@ -223,7 +207,7 @@ def create_chroot(chroot_name):
 	os.system('chroot %s%s apt-get install  vim tzdata ssh locales less nmap sudo ntp python-ipaddr uml-utilities' %(farm_folder,chroot_name))
 	os.system('chroot %s%s dpkg-reconfigure tzdata' %(farm_folder,chroot_name))
 	os.system('chroot %s%s dpkg-reconfigure locales' %(farm_folder,chroot_name))
-	#after creation
+	#setup chroot
 	setup_chroot(chroot_name)
 
 def setup_chroot(chroot_name):
