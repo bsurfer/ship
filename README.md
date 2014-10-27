@@ -5,8 +5,11 @@ Introduction
 ------------
 
 This simple script is very helpful if you want, quickly, test some software in a chroot with totally isolation (mounts, network, user,etc), using some new technologies like namespaces. This is nothing more than one, normal, chroot but isolated.
+
 I called "ship" to each of  isolated chroot. And, is possible you have one or more ship/s running.
+
 With this you don't need to install virtualbox, vmware, etc... ok, but you need install some packages :)
+
 By default, Debian distributions don't have the option -p (unshare pid) and -f (fork before launching) at unshare, so, we need compile the util-linux package.
 
 You change the ip's at /etc/network/interfaces and /etc/hosts in the beginning, before your start.
