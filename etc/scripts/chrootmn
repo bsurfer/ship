@@ -202,7 +202,6 @@ def get_interfaces(path):
 def create_chroot(chroot_name):
 	os.system('apt-get install binutils debootstrap')
 	os.system('mkdir -p %s%s' %(farm_folder,chroot_name))
-	os.system('apt-get install binutils debootstrap')
 	os.system('debootstrap --arch  amd64 wheezy %s%s http://http.debian.net/debian' %(farm_folder,chroot_name))
 	os.system('chroot %s%s apt-get install  vim tzdata ssh locales less nmap sudo ntp python-ipaddr uml-utilities' %(farm_folder,chroot_name))
 	os.system('chroot %s%s dpkg-reconfigure tzdata' %(farm_folder,chroot_name))
