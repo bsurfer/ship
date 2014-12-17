@@ -16,7 +16,8 @@ mkdir -p  $farm_folder
 echo -e 'Copy files'
 cp -r  etc/*  $config_folder
 unlink /usr/bin/chrootmn
-ln -s $config_folder/scripts/chrootmn /usr/bin/
+unlink /usr/bin/chrootmns
+ln -s $config_folder/scripts/chrootmns /usr/bin/
 
 echo -e 'Compile nsender and unshare'
 cd /tmp

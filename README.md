@@ -15,6 +15,8 @@ By default, Debian distributions don't have the option -p (unshare pid) and -f (
 You change the ip's at /etc/network/interfaces and /etc/hosts in the beginning, before your start.
 By default i use 192.168.79.139. The next version must have this feature solved.
 
+Now, the openvswitch support was release. Some configurations are needed on host (see below) and use the chrootmns script.
+
 In the next version i will test/develop, first, in Ubuntu and after CentOs
 
 Note
@@ -36,6 +38,31 @@ deb http://http.debian.net/debian wheezy-backports main
 
 - Debian/Ubuntu packages:
 build-essential python-dev python-pkg-resources python-setuptools python-ipaddr
+
+- Openvswitch packages:
+openvswitch-switch
+
+- Openvswitch config:
+```bash
+ovs-vsctl add-br ovsbr
+ovs-vsctl add-port ovsbr eth0
+
+cat /etc/network/interfaces
+auto eth0
+iface eth0 inet static
+address 0.0.0.0
+auto ovsbr
+iface ovsbr inet static
+        pre-up /etc/init.d/openvswitch-switch start
+        ovs_type OVSBridge
+        ovs_ports eth0 ovsbr
+        address 192.168.79.131
+        netmask 255.255.255.0
+        broadcast 192.168.79.255
+        gateway 192.168.79.2
+        dns-nameservers 192.168.79.2
+        up /sbin/ifconfig $IFACE up
+```
 
 - Python packages:
 sh config
