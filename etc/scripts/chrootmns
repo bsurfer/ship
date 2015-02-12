@@ -120,15 +120,15 @@ def status_chroot(value):
 	cmd=("ps -ef | grep %s | grep -v grep | grep -v nsenter| awk '{print $2}'") %value
         pid = os.popen(cmd).readline().rstrip()
 	if len(pid) < 1:
-		print 'Chroot: %s - STOPED' %value
+		print 'Ship: %s - STOPED' %value
 		return False
 	else:
 		cmd=('ps -o pid --ppid %s | tail -1') %pid
-		if os.popen(cmd).readline().rstrip() == get_pid(value):
-			print 'Chroot: '+value+' - STARTED'
+		if os.popen(cmd).readline().rstrip().strip() == get_pid(value):
+			print 'Ship: '+value+' - STARTED'
 			return True
 		else:
-			print 'Chroot: %s - STOPED' %value
+			print 'Ship: %s - STOPED' %value
 			return False
 
 def start_chroot(value):
@@ -166,14 +166,14 @@ def stop_chroot(value='all'):
 			os.system('kill %s' %pid)
 			delete_pid(value)
 		else:
-			print 'Chroot %s is STOPED' %value
+			print 'Ship %s is STOPED' %value
 	else:
 		print 'The file %s%s/etc/init.d/start_chroot do not exist!!!' %(farm_folder,value)
 
 def start_network(value='all'):
 	ip=validate_start(get_ip_chroot(value))
 	if ip is not None:
-		print 'Chroot: %s - IP: %s ' %(value,ip)
+		print 'Ship: %s - IP: %s ' %(value,ip)
 		create_network(value)
 	else:
 		print 'IP not valid or already exist' 
@@ -206,23 +206,11 @@ def create_network_stage2_wan(pid,chroot):
 	os.system('ifconfig %swan up' %chroot )
 
 def connect(name):
-    pids = os.popen('pidof unshare').readlines()
-    if len(pids) < 1:
-	print 'Nothing Running'
-	return False
-
-    cmd=("ps -ef | grep %s |grep unshare |grep -v grep | awk  '{print $2}'") %name
-    pid = os.popen(cmd).readlines()
-    if len(pid) < 1:
-	print 'Chroot not found!!!!!'
-	return False
-    else:
-	for pi in pids[0].split():
-		if len(pid) > 0 and pi == pid[0][:-1]:
-			cmd=('ps -o pid --ppid %s | tail -1') %pid[0][:-1]
-			pi = os.popen(cmd).readlines()
-                        cmd=('%sbin/nsenter -t %s  -m -u -p -n chroot %s%s ') %(config_folder,pi[0][:-1],farm_folder,name)
-			os.system(cmd)
+	if get_pid(name) is not False:
+		cmd=('%sbin/nsenter -t %s  -m -u -p -n chroot %s%s ') %(config_folder,get_pid(name),farm_folder,name)
+		os.system(cmd)
+	else:
+		print 'Ship not started'
 
 def get_interfaces(path):
     if os.path.isfile('%s%s/etc/network/interfaces' %(farm_folder,path)):
