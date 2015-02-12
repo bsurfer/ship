@@ -47,6 +47,9 @@ def check_ip(ip):
 def list_chroots():
 	return os.listdir(farm_folder)
 
+def father_hostname(chroot):
+	os.system('cp /etc/hostname  %s%s/etc/hostname.father' %(farm_folder,chroot))
+
 def get_ip_chroot(path):
 	if os.path.isfile('%s%s/etc/network/interfaces' %(farm_folder,path)):
 		get_ip=("cat %s%s/etc/network/interfaces  | grep addr |awk '{print $2}' | head -n1" ) %(farm_folder,path)
@@ -66,6 +69,30 @@ def validate_start(ip):
         return ip
     else:
         return None
+
+def path_pid():
+	path='/var/run/chroot'
+	if not os.path.exists(path):
+		os.makedirs(path)
+
+def get_pid(value):
+	try:
+		pid_file = '/var/run/chroot/%s.pid' %value 
+		open_file = open(pid_file)
+		return open_file.readline().rstrip()
+	except (IOError, OSError) as e:
+		return False
+	
+def create_pid(pid,chroot):
+	os.system('echo %s > /var/run/chroot/%s.pid'  %(pid,chroot) )
+
+def delete_pid(chroot):
+	os.system('rm /var/run/chroot/%s.pid'  %(chroot) )
+
+def get_start_pid(pid):
+	 cmd=('ps -o pid --ppid %s | tail -1') %pid
+	 pi = os.popen(cmd).readlines()
+	 return pi[0].rstrip()
 
 def chroot_exist(name):
 	if name in list_chroots():
@@ -87,46 +114,44 @@ def stop_all():
 
 def status_chroot(value):
     	status=False
-	if not chroot_exist(value):
+	if not chroot_exist(value) and get_pid(value):
 		return False
-		
-	pids = os.popen('pidof unshare').readlines()
-	if len(pids) < 1:
-		print '%s Not Running' %value
-		return False
+	
 	cmd=("ps -ef | grep %s | grep -v grep | grep -v nsenter| awk '{print $2}'") %value
-        pid = os.popen(cmd).readlines()
+        pid = os.popen(cmd).readline().rstrip()
 	if len(pid) < 1:
 		print 'Chroot: %s - STOPED' %value
 		return False
 	else:
-		for pi in pids[0].split():
-			if len(pid) > 0 and pi == pid[0][:-1]:
-				status=True
-		if status is True:
-        		cmd=('ps -o pid --ppid %s | tail -1') %pid[0][:-1]
-        		pi = os.popen(cmd).readlines()
+		cmd=('ps -o pid --ppid %s | tail -1') %pid
+		if os.popen(cmd).readline().rstrip() == get_pid(value):
 			print 'Chroot: '+value+' - STARTED'
 			return True
 		else:
 			print 'Chroot: %s - STOPED' %value
 			return False
 
-
 def start_chroot(value):
 	if not chroot_exist(value):
 		return False
-	
+	path_pid()	
 	if os.path.isfile('%s%s/etc/init.d/start_chroot' %(farm_folder,value)):
 		if status_chroot(value) is True:
 			print 'Nothing to do!!'
 		else:
 			start_network(value)
+			if get_interfaces(value) is '2':
+				create_network_wan(value)
+			father_hostname(value)
 			cmd=('setsid %sbin/unshare -m -p -u -n -f chroot %s%s /etc/init.d/start_chroot ') %(config_folder,farm_folder,value)
 			print 'Launch Chroot'
-			subprocess.Popen(['/bin/bash', '-c', cmd])
-			pid = get_unshare_pid(value)
+			p_pid = subprocess.Popen(['/bin/bash', '-c', cmd]).pid
+			time.sleep(1)
+			pid = get_start_pid(p_pid)
+			create_pid(pid,value)
 			create_network_stage2(pid,value)
+			if get_interfaces(value) is '2':
+				create_network_stage2_wan(pid,value)
 	else:
 		print 'The file %s%s/etc/init.d/start_chroot do not exist!!!!' %(farm_folder,value)
 
@@ -136,21 +161,14 @@ def stop_chroot(value='all'):
 	
 	if os.path.isfile('%s%s/etc/init.d/start_chroot' %(farm_folder,value)):
 		if status_chroot(value) is True:
-			pid=get_unshare_pid(value)
+			pid=get_pid(value)
 			print 'Shutdown: %s Pid: %s' %(value,pid)
 			os.system('kill %s' %pid)
+			delete_pid(value)
 		else:
 			print 'Chroot %s is STOPED' %value
 	else:
 		print 'The file %s%s/etc/init.d/start_chroot do not exist!!!' %(farm_folder,value)
-
-def get_unshare_pid(chroot):
-	cmd=("ps -ef | grep %s | grep unshare| grep -v grep | grep -v python | awk  '{print $2}'") %chroot
-        pid = os.popen(cmd).readlines()
-	if len(pid) > 0 :
-        	cmd=('ps -o pid --ppid %s | tail -1') %pid[0][:-1]
-        	pi = os.popen(cmd).readlines()
-		return pi[0][:-1]
 
 def start_network(value='all'):
 	ip=validate_start(get_ip_chroot(value))
@@ -163,6 +181,7 @@ def start_network(value='all'):
 
 def create_network(chroot):
         print 'Create Network'
+	os.system('ip link delete %s'  %(chroot) )
         os.system('ip link add %s type veth peer name veth0' %chroot)
         os.system('ovs-vsctl del-port ovsbr %s; ovs-vsctl add-port ovsbr %s'  %(chroot,chroot) )
         os.system('ifconfig %s promisc' %chroot)
@@ -172,6 +191,19 @@ def create_network_stage2(pid,interface):
         os.system('ip link set netns %s veth0' %pid)
         os.system('ifconfig %s promisc'  %interface)
         os.system('ifconfig %s up'  %interface)
+
+def create_network_wan(chroot):
+	print 'Create Network'
+	os.system('ip link delete %swan'  %(chroot) )
+	os.system('ip link add %swan type veth peer name veth1' %chroot )
+	os.system('ovs-vsctl del-port wanbr %swan; ovs-vsctl add-port wanbr %swan' %(chroot,chroot))
+	os.system('ifconfig %swan promisc' %chroot)
+
+def create_network_stage2_wan(pid,chroot):
+	print 'Put interfaces wan UP!!! PID: %s' %(pid)
+	os.system('ip link set netns %s veth1' %pid)
+	os.system('ifconfig %swan promisc' %chroot)
+	os.system('ifconfig %swan up' %chroot )
 
 def connect(name):
     pids = os.popen('pidof unshare').readlines()
