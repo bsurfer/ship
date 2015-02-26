@@ -5,9 +5,9 @@
 auto lo
 iface lo inet loopback
 
-auto NAME
-allow-hotplug NAME
-iface NAME inet static
-address 10.10.10.30
+auto veth0
+allow-hotplug veth0
+iface veth0 inet static
+address 10.10.10.30 
 netmask 255.255.255.0
 gateway 10.10.10.1

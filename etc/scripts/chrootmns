@@ -231,20 +231,15 @@ def create_chroot(chroot_name):
 	setup_chroot(chroot_name)
 
 def setup_chroot(chroot_name):
-	infile='%s/config_files/interfaces' %(config_folder)
+	infile='%s/config_files/interfaces_ovs' %(config_folder)
 	outfile='%s%s/etc/network/interfaces' %(farm_folder,chroot_name)
 	fstabfile='%s%s/etc/fstab' %(farm_folder,chroot_name)
 	mtabfile='%s%s/etc/mtab' %(farm_folder,chroot_name)
 	hostfile='%s%s/etc/hostname' %(farm_folder,chroot_name)
 	hostsfile='%s%s/etc/hosts' %(farm_folder,chroot_name)
-	f1 = open(infile, 'r')
-	f2 = open(outfile, 'w')
-	for line in f1:
-		    f2.write(line.replace('NAME', chroot_name))
-	f1.close()
-	f2.close()
+	os.system('cp %s %s ' %(infile,outfile))
 	#hosts
-	write_files(hostsfile,'192.168.79.139		me','ab')
+	write_files(hostsfile,'10.10.10.30		me','ab')
 	#hostname
 	write_files(hostfile,chroot_name,'wb')
 	#mtab

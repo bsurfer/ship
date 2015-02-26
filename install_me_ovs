@@ -18,8 +18,8 @@ mkdir -p  $config_folder
 mkdir -p  $farm_folder
 echo -e 'Copy files'
 cp -r  etc/*  $config_folder
-unlink /usr/bin/chrootmn
-ln -s $config_folder/scripts/chrootmn /usr/bin/
+unlink /usr/bin/chrootmns
+ln -s $config_folder/scripts/chrootmns /usr/bin/chrootmn
 
 echo -e 'Compile nsender and unshare'
 cd /tmp
@@ -33,3 +33,25 @@ cp nsenter $config_folder/bin
 cp unshare $config_folder/bin
 
 echo -e 'Finish'
+
+
+
+echo -e 'OpenVswitch config:'
+echo -e 'ovs-vsctl add-br ovsbr'
+echo -e 'ovs-vsctl add-port ovsbr eth0'
+echo -e ''
+echo -e 'cat /etc/network/interfaces'
+echo -e 'auto eth0'
+echo -e 'iface eth0 inet static'
+echo -e 'address 0.0.0.0'
+echo -e 'auto ovsbr'
+echo -e 'iface ovsbr inet static'
+echo -e '        pre-up /etc/init.d/openvswitch-switch start'
+echo -e '        ovs_type OVSBridge'
+echo -e '        ovs_ports eth0 ovsbr'
+echo -e '        address 192.168.79.131'
+echo -e '        netmask 255.255.255.0'
+echo -e '        broadcast 192.168.79.255'
+echo -e '        gateway 192.168.79.2'
+echo -e '        dns-nameservers 192.168.79.2'
+echo -e '        up /sbin/ifconfig $IFACE up'
