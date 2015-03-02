@@ -16,6 +16,8 @@ import subprocess
 import time
 import random
 import sh
+import signal
+import shutil
 from config import Config
 
 #Read config values
@@ -47,8 +49,20 @@ def check_ip(ip):
 def list_chroots():
 	return os.listdir(farm_folder)
 
+def copy_file(src, dest):
+	try:
+		shutil.copy(src, dest)
+		# eg. src and dest are the same file
+	except shutil.Error as e:
+		print('Error: %s' % e)
+		# eg. source or destination doesn't exist
+	except IOError as e:
+		print('Error: %s' % e.strerror)
+
 def father_hostname(chroot):
-	os.system('cp /etc/hostname  %s%s/etc/hostname.father' %(farm_folder,chroot))
+	src='/etc/hostname'
+	dest='%s%s/etc/hostname.father' %(farm_folder,chroot)
+	copy_file(src, dest)
 
 def get_ip_chroot(path):
 	if os.path.isfile('%s%s/etc/network/interfaces' %(farm_folder,path)):
@@ -87,7 +101,8 @@ def create_pid(pid,chroot):
 	os.system('echo %s > /var/run/chroot/%s.pid'  %(pid,chroot) )
 
 def delete_pid(chroot):
-	os.system('rm /var/run/chroot/%s.pid'  %(chroot) )
+	files='/var/run/chroot/%s.pid' %(chroot)
+	os.remove(files)
 
 def get_start_pid(pid):
 	 cmd=('ps -o pid --ppid %s | tail -1') %pid
@@ -117,7 +132,7 @@ def status_chroot(value):
 	if not chroot_exist(value) and get_pid(value):
 		return False
 	
-	cmd=("ps -ef | grep %s | grep -v grep | grep -v nsenter| awk '{print $2}'") %value
+	cmd=("ps -ef | grep %s%s | grep -v grep | grep -v nsenter| awk '{print $2}'") %(farm_folder,value)
         pid = os.popen(cmd).readline().rstrip()
 	if len(pid) < 1:
 		print 'Ship: %s - STOPED' %value
@@ -161,9 +176,9 @@ def stop_chroot(value='all'):
 	
 	if os.path.isfile('%s%s/etc/init.d/start_chroot' %(farm_folder,value)):
 		if status_chroot(value) is True:
-			pid=get_pid(value)
+			pid=int(get_pid(value))
 			print 'Shutdown: %s Pid: %s' %(value,pid)
-			os.system('kill %s' %pid)
+			os.kill(pid, signal.SIGTERM)
 			delete_pid(value)
 		else:
 			print 'Ship %s is STOPED' %value
@@ -237,7 +252,7 @@ def setup_chroot(chroot_name):
 	mtabfile='%s%s/etc/mtab' %(farm_folder,chroot_name)
 	hostfile='%s%s/etc/hostname' %(farm_folder,chroot_name)
 	hostsfile='%s%s/etc/hosts' %(farm_folder,chroot_name)
-	os.system('cp %s %s ' %(infile,outfile))
+	copy_file(infile,outfile)
 	#hosts
 	write_files(hostsfile,'10.10.10.30		me','ab')
 	#hostname
@@ -250,7 +265,10 @@ def setup_chroot(chroot_name):
 		"none    /dev/pts    devpts    defaults    0    0\n"
 	)
 	write_files(fstabfile,text,'wb')
-	os.system('cp %s/config_files/start_chroot %s%s/etc/init.d/start_chroot ;chmod +x %s%s/etc/init.d/start_chroot;' %(config_folder,farm_folder,chroot_name,farm_folder,chroot_name))
+	src='%s/config_files/start_chroot' %(config_folder)
+	dest='%s%s/etc/init.d/start_chroot' %(farm_folder,chroot_name)
+	copy_file(src,dest)
+	os.chmod(dest,0755)
 
 def write_files(filename,text,mode):
 	f1 = open(filename,mode)
