@@ -18,13 +18,22 @@ import random
 import sh
 import signal
 import shutil
+import ipcalc
+from ipcalc import *
+from netaddr import *
 from config import Config
 
+
 #Read config values
-f = file('/etc/chroot/config/chroot.cfg')
-cfg = Config(f)
-farm_folder=cfg.farm_folder
-config_folder=cfg.config_folder
+try:
+	f = file('/etc/ship/config/ship.cfg')
+	cfg = Config(f)
+	farm_folder=cfg.farm_folder
+	config_folder=cfg.config_folder
+	pid_folder=cfg.pid_folder
+except:
+	print 'Please verify the config file'
+	sys.exit(0)
 
 def valid_ip(ip):
         try:
@@ -85,23 +94,22 @@ def validate_start(ip):
         return None
 
 def path_pid():
-	path='/var/run/chroot'
-	if not os.path.exists(path):
-		os.makedirs(path)
+	if not os.path.exists(pid_folder):
+		os.makedirs(pid_folder)
 
 def get_pid(value):
 	try:
-		pid_file = '/var/run/chroot/%s.pid' %value 
+		pid_file = '%s%s.pid' %(pid_folder,value)
 		open_file = open(pid_file)
 		return open_file.readline().rstrip()
 	except (IOError, OSError) as e:
 		return False
 	
 def create_pid(pid,chroot):
-	os.system('echo %s > /var/run/chroot/%s.pid'  %(pid,chroot) )
+	os.system('echo %s > %s%s.pid'  %(pid,pid_folder,chroot) )
 
 def delete_pid(chroot):
-	files='/var/run/chroot/%s.pid' %(chroot)
+	files='%s%s.pid' %(pid_folder,chroot)
 	os.remove(files)
 
 def get_start_pid(pid):
@@ -194,31 +202,36 @@ def start_network(value='all'):
 		print 'IP not valid or already exist' 
 		sys.exit()
 
+
+
 def create_network(chroot):
         print 'Create Network'
-	os.system('ip link delete %s'  %(chroot) )
-        os.system('ip link add %s type veth peer name veth0' %chroot)
-        os.system('ovs-vsctl del-port ovsbr %s; ovs-vsctl add-port ovsbr %s'  %(chroot,chroot) )
-        os.system('ifconfig %s promisc' %chroot)
+        mac=[random.choice(range(256)) for i in range(6)]
+        mac[0] |= 0x02
+        mac[0] &= 0xfe
+        mact=':'.join('%02x' % m for m in mac)
+        os.system('ip link delete %s' %chroot)
+        os.system('ip link add link eth0 %s address %s type macvtap mode bridge' %(chroot,mact))
 
 def create_network_stage2(pid,interface):
         print 'Put interfaces %s UP!!! PID: %s' %(interface,pid)
-        os.system('ip link set netns %s veth0' %pid)
-        os.system('ifconfig %s promisc'  %interface)
+        os.system('ip link set netns %s %s' %(pid,interface))
         os.system('ifconfig %s up'  %interface)
 
+
 def create_network_wan(chroot):
-	print 'Create Network'
-	os.system('ip link delete %swan'  %(chroot) )
-	os.system('ip link add %swan type veth peer name veth1' %chroot )
-	os.system('ovs-vsctl del-port wanbr %swan; ovs-vsctl add-port wanbr %swan' %(chroot,chroot))
-	os.system('ifconfig %swan promisc' %chroot)
+        print 'Create Network'
+        mac=[random.choice(range(256)) for i in range(6)]
+        mac[0] |= 0x02
+        mac[0] &= 0xfe
+        mact=':'.join('%02x' % m for m in mac)
+        os.system('ip link delete %swan'  %(chroot) )
+        os.system('ip link add link eth0 %swan address %s type macvtap mode bridge' %(chroot,mact))
 
 def create_network_stage2_wan(pid,chroot):
-	print 'Put interfaces wan UP!!! PID: %s' %(pid)
-	os.system('ip link set netns %s veth1' %pid)
-	os.system('ifconfig %swan promisc' %chroot)
-	os.system('ifconfig %swan up' %chroot )
+        print 'Put interfaces wan UP!!! PID: %s' %(pid)
+        os.system('ip link set netns %s %swan' %(pid,interface))
+        os.system('ifconfig %swan up'  %interface)
 
 def connect(name):
 	if get_pid(name) is not False:
@@ -234,27 +247,40 @@ def get_interfaces(path):
         num = str(num[0][:-1])
         return num	
 
-def create_chroot(chroot_name):
+def create_chroot(chroot_name,ip):
 	os.system('apt-get install binutils debootstrap')
-	os.system('mkdir -p %s%s' %(farm_folder,chroot_name))
+	folder='%s%s' %(farm_folder,chroot_name)
+	os.makedirs(folder)
 	os.system('apt-get install binutils debootstrap')
 	os.system('debootstrap --arch  amd64 wheezy %s%s http://http.debian.net/debian' %(farm_folder,chroot_name))
-	os.system('chroot %s%s apt-get install  vim tzdata ssh locales less nmap sudo ntp python-ipaddr uml-utilities' %(farm_folder,chroot_name))
+	os.system('chroot %s%s apt-get install  vim tzdata ssh locales  ntp' %(farm_folder,chroot_name))
 	os.system('chroot %s%s dpkg-reconfigure tzdata' %(farm_folder,chroot_name))
 	os.system('chroot %s%s dpkg-reconfigure locales' %(farm_folder,chroot_name))
 	#setup chroot
-	setup_chroot(chroot_name)
+	setup_chroot(chroot_name,ip)
 
-def setup_chroot(chroot_name):
-	infile='%s/config_files/interfaces_ovs' %(config_folder)
+def setup_chroot(chroot_name,ip):
+	ipn=ip+'/24'
+	ips = Network(ipn)
+	infile='%s/config_files/interfaces' %(config_folder)
 	outfile='%s%s/etc/network/interfaces' %(farm_folder,chroot_name)
 	fstabfile='%s%s/etc/fstab' %(farm_folder,chroot_name)
 	mtabfile='%s%s/etc/mtab' %(farm_folder,chroot_name)
 	hostfile='%s%s/etc/hostname' %(farm_folder,chroot_name)
 	hostsfile='%s%s/etc/hosts' %(farm_folder,chroot_name)
-	copy_file(infile,outfile)
+	f1 = open(infile, 'r')
+	f2 = open(outfile, 'w')
+	for line in f1:
+		f2.write(line.replace('10.10.10.30', str(ip)))
+	for line in f1:
+		f2.write(line.replace('10.10.10.1', str(ips.host_first())))
+	for line in f1:
+		f2.write(line.replace(line.replace('NAME', chroot_name)))
+	f1.close()
+	f2.close()
 	#hosts
-	write_files(hostsfile,'10.10.10.30		me','ab')
+	host_str=ip+'		me'
+	write_files(hostsfile,host_str,'ab')
 	#hostname
 	write_files(hostfile,chroot_name,'wb')
 	#mtab
@@ -277,10 +303,10 @@ def write_files(filename,text,mode):
 
 
 def exit():
-    sys.exit('Usage: %s  start all | start ship_name | stop all | stop ship_name | status | con ship_name' % sys.argv[0])
+    sys.exit('Usage: %s  start all | start ship_name | stop all | stop ship_name | status | con ship_name | create ship_name IP' % sys.argv[0])
 
 
-if len(sys.argv) > 1 and len(sys.argv) < 4:
+if len(sys.argv) > 1 and len(sys.argv) < 5:
     if len(sys.argv) == 3 and sys.argv[1]=='start' and sys.argv[2]=='all':
         print 'Start all'
 	start_all()
@@ -302,10 +328,11 @@ if len(sys.argv) > 1 and len(sys.argv) < 4:
         ch=sys.argv[2]
         print 'Connect %s' %ch
         connect(ch) 
-    elif len(sys.argv) == 3 and sys.argv[1]=='create':
+    elif len(sys.argv) == 4 and sys.argv[1]=='create':
         ch=sys.argv[2]
-        print 'Create chroot %s' %ch
-        create_chroot(ch) 
+        ip=sys.argv[3]
+	print 'Create chroot %s ip: %s' %(ch,ip) 
+        create_chroot(ch,ip) 
     else:
         exit()
 

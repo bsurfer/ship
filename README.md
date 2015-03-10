@@ -1,6 +1,15 @@
 ship
 ========
 
+
+Purpose
+------------
+
+- Have various services in same host
+- Shared resources
+- Isolated services
+- Isolated IP Address
+
 Introduction
 ------------
 
@@ -19,6 +28,19 @@ Now, the openvswitch support was release. Some configurations are needed on host
 
 In the next version i will test/develop, first, in Ubuntu and after CentOs
 
+
+Features
+------------
+
+- Run like a normal SO
+- All services was isolated
+- /proc and /sys are host independent
+- Is possible have one or more network interfaces
+- CLI to start/stop/connect in to chip
+- run different versions of debian OS
+- Portable
+
+
 Note
 ------------
 Developed and tested at debian wheezy, only!
@@ -28,12 +50,12 @@ Requirements
 ------------
 - Kernel >= 3.14
 
-Add this repository to install kernel 3.14:
+Add this repository to install kernel > 3.14:
 
 ```bash
 deb http://http.debian.net/debian wheezy-backports main
 
-> apt-get -t wheezy-backports install linux-image-3.14-0.bpo.1-amd64
+> apt-get -t wheezy-backports install linux-image-amd64 
 ```
 
 - Debian/Ubuntu packages:
@@ -83,15 +105,17 @@ Installation
 ------------
 From Script:
 > sh install_me
+with openvswitch
+> sh install_me_ovs
 
 
 Usage
 -----
 ```bash
-Usage: chrootmn [options]
+Usage: shipmn [options]
 
 Options:
-  create			create new chroot using debootstrap
+  create			create new ship using debootstrap
   status			ship's status
   start all			start all ship's
   start ship_name		start ship
@@ -103,10 +127,10 @@ Options:
 Examples:
 
 ```bash
--> chrootmn create webserver
--> chrootmn status
+-> shipmn create webserver
+-> shipmn status
 Status all
 webserver Not Running
--> chrootmn start webserver
--> chrootmn con webserver
+-> shipmn start webserver
+-> shipmn con webserver
 ```
