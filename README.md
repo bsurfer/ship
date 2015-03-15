@@ -61,7 +61,9 @@ Add this repository to install kernel > 3.14:
 
 - Debian/Ubuntu packages:
 > apt-get install build-essential python-dev python-pkg-resources python-setuptools  python-ipaddr curl unzip vim openvswitch-switch
+
 > easy_install pip
+
 > pip install ipcalc netaddr sh config
 
 
