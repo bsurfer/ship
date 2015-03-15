@@ -53,7 +53,9 @@ Add this repository to install kernel > 3.14:
 
 ```bash
 > echo 'deb http://ftp.debian.org/debian/ wheezy-backports main non-free contrib' >> /etc/apt/sources.list
+
 > apt-get update
+
 > apt-get -t wheezy-backports install linux-image-amd64 linux-headers-amd64 
 ```
 
