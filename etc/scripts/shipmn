@@ -271,11 +271,14 @@ def setup_chroot(chroot_name,ip):
 	f1 = open(infile, 'r')
 	f2 = open(outfile, 'w')
 	for line in f1:
-		f2.write(line.replace('10.10.10.30', str(ip)))
-	for line in f1:
-		f2.write(line.replace('10.10.10.1', str(ips.host_first())))
-	for line in f1:
-		f2.write(line.replace(line.replace('NAME', chroot_name)))
+		if '10.10.10.30' in line:
+			f2.write(line.replace('10.10.10.30', str(ip)))
+		elif '10.10.10.1' in line:
+			f2.write(line.replace('10.10.10.1', str(ips.host_first())))
+		elif 'NAME' in line:
+			f2.write(line.replace(line.replace('NAME', chroot_name)))
+		else:
+			f2.write(line)
 	f1.close()
 	f2.close()
 	#hosts

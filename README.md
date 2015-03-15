@@ -40,10 +40,9 @@ Features
 - run different versions of debian OS
 - Portable
 
-
 Note
 ------------
-Developed and tested at debian wheezy, only!
+Developed and tested in debian and derivatives, only!
 
 
 Requirements
@@ -53,60 +52,21 @@ Requirements
 Add this repository to install kernel > 3.14:
 
 ```bash
-deb http://http.debian.net/debian wheezy-backports main
-
-> apt-get -t wheezy-backports install linux-image-amd64 
+> echo 'deb http://ftp.debian.org/debian/ wheezy-backports main non-free contrib' >> /etc/apt/sources.list
+> apt-get update
+> apt-get -t wheezy-backports install linux-image-amd64 linux-headers-amd64 
 ```
 
 - Debian/Ubuntu packages:
-build-essential python-dev python-pkg-resources python-setuptools python-ipaddr
+> apt-get install build-essential python-dev python-pkg-resources python-setuptools  python-ipaddr curl unzip vim openvswitch-switch
+> easy_install pip
+> pip install ipcalc netaddr sh config
 
-- Openvswitch packages:
-openvswitch-switch
-
-- Openvswitch config:
-```bash
-ovs-vsctl add-br ovsbr
-ovs-vsctl add-port ovsbr eth0
-
-cat /etc/network/interfaces
-auto eth0
-iface eth0 inet static
-address 0.0.0.0
-auto ovsbr
-iface ovsbr inet static
-        pre-up /etc/init.d/openvswitch-switch start
-        ovs_type OVSBridge
-        ovs_ports eth0 ovsbr
-        address 192.168.79.131
-        netmask 255.255.255.0
-        broadcast 192.168.79.255
-        gateway 192.168.79.2
-        dns-nameservers 192.168.79.2
-        up /sbin/ifconfig $IFACE up
-```
-
-- Python packages:
-sh config
-
-- unshare and nsenter from util-linux 2.24
-```bash
-curl https://www.kernel.org/pub/linux/utils/util-linux/v2.24/util-linux-2.24.tar.gz | tar -zxf-
-
-cd util-linux-2.24
-./configure --without-ncurses
-make nsenter
-make unshare
-cp nsenter $config_folder/bin
-cp unshare $config_folder/bin
-```
 
 Installation
 ------------
 From Script:
-> sh install_me
-with openvswitch
-> sh install_me_ovs
+> sh install_me or sh install_me_ovs
 
 
 Usage
@@ -134,3 +94,5 @@ webserver Not Running
 -> shipmn start webserver
 -> shipmn con webserver
 ```
+
+You can find some use case in HowTo folder!!
